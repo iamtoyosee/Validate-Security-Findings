@@ -1,11 +1,15 @@
 # Phase 1 — Foundations: Call Graph & Reachability
 
-Status: **design settled, not yet built.** Reached after hands-on trials of AppThreat/atom
-against two real apps surfaced real correctness problems (documented below) — the
-decision reversed from "adopt an external tool" to "build a small, deliberately narrow
-engine ourselves," specifically because we don't need to solve the hard problem that
-broke atom, only a simpler, more precise version of it. Next step: implement this and
-test it against the same two apps used to evaluate atom.
+Status: **built and verified.** Reached after hands-on trials of AppThreat/atom against
+two real apps surfaced real correctness problems (documented below) — the decision
+reversed from "adopt an external tool" to "build a small, deliberately narrow engine
+ourselves," specifically because we don't need to solve the hard problem that broke
+atom, only a simpler, more precise version of it. Implemented in `src/reachability/`
+(`graph.py`, `entry_points.py`, `engine.py`); independently verified against all 12 real,
+documented ground-truth findings across both apps (todo app + e-commerce app) — 12/12
+match — plus a synthetic 4-hop chain proving multi-hop traversal genuinely walks the
+full chain, not just one level. Not yet wired into `src/api.py` or the frontend — see
+"Next step."
 
 ## What a call graph is and why we need it
 
@@ -247,22 +251,57 @@ messier code, not something today's test cases exercise.
   detection or reachability queries at all — we'd still build both ourselves on a less
   reliable foundation.
 
-## Next step
+## Two scope decisions made during implementation, beyond the original design
 
-Implement this pipeline (function table → call resolution → entry-point tagging →
-backward walk → verdict) and test it against the same two apps used to evaluate atom —
-the todo app (3 findings, ground truth already documented) and the e-commerce app (9
-findings, 6 reachable / 3 dead, ground truth established by direct `grep` during atom's
-trial). Same verification discipline as everything else: don't trust it until it's been
-run against known answers. Not yet done.
+- **A Flask entry-point detector was added alongside the `http.server` one**, beyond the
+  "only what the todo app needs" scoping above — because the e-commerce app's real,
+  verified ground truth (6 reachable, 3 dead) gives a much stronger correctness test
+  than the todo app's 3 findings alone, and a second small detector was cheap given the
+  pluggable design. Both detectors live in `entry_points.py`, independently testable.
+- **`unknown`-status detection (tracking skipped ambiguous calls to see if they could
+  plausibly form a path) was explicitly NOT built.** The schema supports the status
+  value, but nothing in this implementation produces it via that path — every edge that
+  exists is confident by construction, so every `reachable` verdict is trivially `high`
+  confidence (no partial-confidence tier to track). The one place `status="unknown"`
+  *is* produced: `resolve_containing_function()` returning no match (module-level code)
+  — mapped to `unknown`/`low` rather than silently dropping the finding. Neither test
+  app has a module-level finding, so this path is implemented but not exercised by the
+  ground-truth tests.
+
+## Real gap this surfaced, not a Phase 1 bug
+
+`receipt_text` (e-commerce app, line 100) has **no real scanner finding** — neither a
+real `semgrep scan --config=auto` nor Bandit flags its `Path(...) / name` +
+`.read_text()` path-traversal pattern; the only path-traversal rule that fires in that
+file catches a different line (`checkout()`'s write, not this read). Per "Out of scope:
+scanner accuracy" (`docs/phase-0-foundations.md`), this is a scanner-coverage gap, not
+something this project is responsible for — a `NormalizedFinding` was hand-constructed
+for this one case so the ground-truth ledger still fully exercises the reachability
+engine, documented clearly in `Ecommerce-app/ground_truth.md`, not smoothed over.
+
+## Wired into the running app
+
+`/api/scan` now also builds a call graph from the uploaded codebase's `.py` files and
+returns a `reachability` array alongside `findings` (linked by `finding_id`, per the
+"three linked records, not one merged object" design from `docs/phase-0-foundations.md`
+— not merged into the finding objects). The frontend's "Reachability Analysis" tab shows
+real data (`ReachabilityView.tsx`) instead of the placeholder, joining findings and
+verdicts by `finding_id`, same list-then-detail pattern as the Findings tab.
+
+One robustness fix made during wiring, not part of the original design: `build_call_graph`
+now skips files that fail to parse (`SyntaxError`) rather than crashing the whole scan —
+necessary once real, arbitrary uploaded code is actually going through this path, not
+just two known-good sample apps.
+
+Verified end to end against a real running server (not just pytest): uploading the todo
+app through a live `/api/scan` call returns the exact same 3 correct verdicts confirmed
+earlier, and both the FastAPI and Vite dev servers run together with no errors.
 
 ## Open questions
 
-- Exact `containing_function` resolution for a finding's file:line — `resolve_containing_function()`
-  was designed in `docs/phase-0-foundations.md` but not yet implemented; this phase is
-  where it actually gets built and wired to the step-1 function table.
-- Zero-candidates (module-level code) case from `docs/phase-0-foundations.md` — still
-  not decided, still Phase 1's problem to resolve when it's actually being built.
-- Whether to track skipped ambiguous calls explicitly (to power the `unknown` status) or
-  simply omit them — leaning toward tracking, since silently omitting them would make
-  `unknown` undetectable in practice, but not yet decided in implementation detail.
+- Multi-file codebases: the function table is codebase-wide with no file-scoping for
+  name collisions — both real test apps are single-file, so this hasn't been exercised.
+  A real gap if two files ever define same-named functions differently.
+- Whether `unknown`-status detection (tracked ambiguous-call plausibility) is worth
+  building before or after broadening entry-point coverage (Phase 2) — no current test
+  case needs it, revisit when one does.

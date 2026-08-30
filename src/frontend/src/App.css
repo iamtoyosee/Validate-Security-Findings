@@ -156,6 +156,9 @@ main {
 .badge-error { background: var(--sev-error); }
 .badge-warning { background: var(--sev-warning); }
 .badge-info { background: var(--sev-info); }
+.badge-status-reachable { background: var(--status-reachable); }
+.badge-status-unreachable { background: var(--status-unreachable); }
+.badge-status-unknown { background: var(--sev-warning); }
 
 .finding-detail {
   border: 1px solid var(--border);

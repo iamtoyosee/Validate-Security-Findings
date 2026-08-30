@@ -15,7 +15,18 @@ export interface Finding {
   code_snippet: string | null;
 }
 
+export interface ReachabilityVerdict {
+  finding_id: string;
+  status: "reachable" | "unreachable" | "unknown";
+  confidence: "high" | "medium" | "low";
+  containing_function: string | null;
+  entry_point: string | null;
+  call_path: string[] | null;
+  reason: string;
+}
+
 export interface ScanResponse {
   raw_result_count: number;
   findings: Finding[];
+  reachability: ReachabilityVerdict[];
 }

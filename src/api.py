@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 
 from semgrep_adapter import from_semgrep, group_raw_results, read_snippet, run_semgrep
 from codebase_source import CodebaseTooLargeError, LocalPathSource
+from reachability.engine import build_call_graph, build_verdict
 
 app = FastAPI()
 
@@ -46,12 +47,20 @@ async def scan(files: list[UploadFile]):
             for f in findings
         ]
 
+        python_files = {
+            str(p.relative_to(codebase_path)): p.read_text()
+            for p in codebase_path.rglob("*.py")
+        }
+        graph = build_call_graph(python_files)
+        reachability = [build_verdict(f, graph) for f in findings]
+
         return JSONResponse({
             "raw_result_count": len(raw_results),
             "findings": [
                 {k: v for k, v in dataclasses.asdict(f).items() if k != "raw"}
                 for f in findings
             ],
+            "reachability": [dataclasses.asdict(v) for v in reachability],
         })
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

@@ -3,6 +3,7 @@ import "./App.css";
 import { scanCodebase } from "./api";
 import { FindingsView } from "./components/FindingsView";
 import { Placeholder } from "./components/Placeholder";
+import { ReachabilityView } from "./components/ReachabilityView";
 import { UploadPanel } from "./components/UploadPanel";
 import type { ScanResponse } from "./types";
 
@@ -72,7 +73,14 @@ function App() {
               {status === "loading" ? "Scanning…" : "Scan a folder to see findings here."}
             </p>
           ))}
-        {tab === "reachability" && <Placeholder label="Reachability Analysis" />}
+        {tab === "reachability" &&
+          (result ? (
+            <ReachabilityView result={result} />
+          ) : (
+            <p className="empty-state">
+              {status === "loading" ? "Scanning…" : "Scan a folder to see reachability analysis here."}
+            </p>
+          ))}
         {tab === "exploitability" && <Placeholder label="Exploitability Analysis" />}
       </main>
     </div>
