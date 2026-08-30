@@ -8,7 +8,13 @@ from typing import Callable, Optional
 from schemas import NormalizedFinding, ReachabilityVerdict
 
 from reachability.entry_points import DEFAULT_ENTRY_POINT_DETECTORS
-from reachability.graph import FunctionSpan, build_call_edges, build_function_table, resolve_containing_function
+from reachability.graph import (
+    FunctionSpan,
+    build_call_edges,
+    build_function_table,
+    build_import_table,
+    resolve_containing_function,
+)
 
 EntryPointDetector = Callable[[dict[str, ast.Module]], set[str]]
 
@@ -18,6 +24,7 @@ class CallGraph:
     functions: list[FunctionSpan]
     edges: dict[str, set[str]]   # caller qualified name -> confidently-called callee qualified names
     entry_points: set[str]        # qualified names tagged reachable-from-outside by some detector
+    unresolved_call_targets: set[str]   # attribute names seen in calls we declined to resolve
 
 
 def build_call_graph(
@@ -41,13 +48,19 @@ def build_call_graph(
     for path, tree in trees.items():
         functions.extend(build_function_table(path, tree))
 
-    edges = build_call_edges(functions)
+    import_tables = {path: build_import_table(tree) for path, tree in trees.items()}
+    edges, unresolved_call_targets = build_call_edges(functions, import_tables)
 
     entry_points: set[str] = set()
     for detector in entry_point_detectors:
         entry_points |= detector(trees)
 
-    return CallGraph(functions=functions, edges=edges, entry_points=entry_points)
+    return CallGraph(
+        functions=functions,
+        edges=edges,
+        entry_points=entry_points,
+        unresolved_call_targets=unresolved_call_targets,
+    )
 
 
 def trace_reachability(graph: CallGraph, start: str) -> Optional[list[str]]:
@@ -108,17 +121,41 @@ def build_verdict(finding: NormalizedFinding, graph: CallGraph) -> ReachabilityV
             reason=f"Reachable via {' -> '.join(path)}.",
         )
 
+    # A same-named function was the target of a call somewhere that we couldn't verify
+    # (e.g. connection.execute() on a local of untracked type) - that call might resolve
+    # to THIS function, so "no path found" doesn't mean "no callers exist," just "we
+    # can't confirm one." This is a name-based heuristic, not a type-based one, matching
+    # the trade-off already accepted elsewhere in this project (e.g. the Celery bare-
+    # decorator match): an unrelated function sharing a name with something called
+    # ambiguously elsewhere (two unrelated `execute` methods in a large codebase) also
+    # gets downgraded to "unknown" - a deliberate, accepted false-positive risk in
+    # exchange for not silently overclaiming certainty on a real one.
+    bare_name = containing.qualified_name.rsplit(".", 1)[-1]
+    if bare_name in graph.unresolved_call_targets:
+        return ReachabilityVerdict(
+            finding_id=finding.finding_id,
+            status="unknown",
+            confidence="low",
+            containing_function=containing.qualified_name,
+            entry_point=None,
+            call_path=None,
+            reason="No confident call path to an entry point was found, but a call "
+                   "elsewhere in the codebase targets a same-named function through a "
+                   "pattern we don't resolve (e.g. a method call on a variable of "
+                   "unverified type) - reachability can't be confidently ruled out.",
+        )
+
     return ReachabilityVerdict(
         finding_id=finding.finding_id,
         status="unreachable",
-        # capped at medium: only 2 entry-point categories are detected today (HTTP
-        # handlers, Flask routes) - "unreachable" is a claim about every possible way
-        # in, and CLI/RPC/queues/scheduled jobs were never checked (see phase-1 doc,
-        # "Confidence has two axes").
+        # capped at medium: only a handful of entry-point categories are detected today
+        # (HTTP handlers, decorator routes, Django URLconf, Celery tasks) - "unreachable"
+        # is a claim about every possible way in, and other categories (CLI, RPC,
+        # scheduled jobs) were never checked (see phase-1 doc, "Confidence has two axes").
         confidence="medium",
         containing_function=containing.qualified_name,
         entry_point=None,
         call_path=None,
-        reason="Not reachable via any known HTTP or Flask entry point. Other "
-               "entry-point types (CLI, RPC, message queues, scheduled jobs) were not checked.",
+        reason="Not reachable via any known HTTP, Django, or Celery entry point. Other "
+               "entry-point types (CLI, RPC, scheduled jobs) were not checked.",
     )

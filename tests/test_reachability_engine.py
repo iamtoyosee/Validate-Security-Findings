@@ -191,6 +191,190 @@ def test_multi_hop_traversal_verdict_end_to_end():
     assert verdict.call_path == EXPECTED_CHAIN
 
 
+# ---- Synthetic Django app: urls.py + views.py, two files in one `files` dict ----
+
+DJANGO_VIEWS_SOURCE = """
+def dead_view(request):
+    return "never routed"
+
+
+def user_detail(request, id):
+    return fetch_user(id)
+
+
+def fetch_user(id):
+    return f"user {id}"
+"""
+
+DJANGO_URLS_SOURCE = """
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("users/<int:id>/", views.user_detail),
+]
+"""
+
+
+def _lineno_of(source: str, function_name: str) -> int:
+    return next(
+        node.body[0].lineno
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.FunctionDef) and node.name == function_name
+    )
+
+
+def django_graph():
+    return build_call_graph({"urls.py": DJANGO_URLS_SOURCE, "views.py": DJANGO_VIEWS_SOURCE})
+
+
+def make_finding(file_path, line, finding_id):
+    return NormalizedFinding(
+        finding_id=finding_id,
+        source_scanner="semgrep",
+        rule_ids=["synthetic-rule"],
+        vulnerability_type="synthetic-rule",
+        cwe=["CWE-000"],
+        severity="ERROR",
+        file_path=file_path,
+        line_start=line,
+        line_end=None,
+        column_start=None,
+        message="synthetic",
+        code_snippet=None,
+        raw=[],
+    )
+
+
+def test_django_view_reached_via_urlpatterns_is_reachable():
+    finding = make_finding("views.py", _lineno_of(DJANGO_VIEWS_SOURCE, "fetch_user"), "django-1")
+    verdict = build_verdict(finding, django_graph())
+    assert_verdict_matches(verdict, "fetch_user", "reachable", "user_detail")
+
+
+def test_django_view_never_referenced_in_urlpatterns_is_unreachable():
+    finding = make_finding("views.py", _lineno_of(DJANGO_VIEWS_SOURCE, "dead_view"), "django-2")
+    verdict = build_verdict(finding, django_graph())
+    assert_verdict_matches(verdict, "dead_view", "unreachable", None)
+
+
+# ---- Synthetic Celery module: both @shared_task shapes plus @app.task ----
+
+CELERY_SOURCE = """
+from celery import shared_task
+
+@shared_task
+def process_upload(file_id):
+    return f"processing {file_id}"
+
+@shared_task(bind=True)
+def send_email(self, to, subject):
+    return f"sending to {to}"
+
+@app.task
+def cleanup():
+    return "cleaning"
+
+def dead_function():
+    return "never called by anything"
+"""
+
+
+def celery_graph():
+    return build_call_graph({"tasks.py": CELERY_SOURCE})
+
+
+@pytest.mark.parametrize(
+    "function_name,expected_status,expected_entry",
+    [
+        ("process_upload", "reachable", "process_upload"),     # bare @shared_task, no call
+        ("send_email", "reachable", "send_email"),               # bare @shared_task(bind=True), with call
+        ("cleanup", "reachable", "cleanup"),                       # attribute-style @app.task
+        ("dead_function", "unreachable", None),                   # no decorator, no callers
+    ],
+)
+def test_celery_task_verdicts(function_name, expected_status, expected_entry):
+    finding = make_finding("tasks.py", _lineno_of(CELERY_SOURCE, function_name), f"celery-{function_name}")
+    verdict = build_verdict(finding, celery_graph())
+    assert_verdict_matches(verdict, function_name, expected_status, expected_entry)
+
+
+# ---- unknown vs unreachable: the two situations "no path found" used to conflate ----
+
+def test_genuinely_zero_callers_stays_unreachable_medium_confidence():
+    # dead_function has no callers anywhere, ambiguous or otherwise - the strong signal
+    # case, must stay "unreachable"/"medium", exactly as before this fix existed.
+    source = """
+from http.server import BaseHTTPRequestHandler
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        return helper()
+
+
+def helper():
+    return "reachable"
+
+
+def dead_function():
+    return "never called by anything, ambiguously or otherwise"
+"""
+    graph = build_call_graph({"app.py": source})
+    finding = make_finding("app.py", _lineno_of(source, "dead_function"), "unknown-1")
+    verdict = build_verdict(finding, graph)
+
+    assert verdict.status == "unreachable"
+    assert verdict.confidence == "medium"
+
+
+def test_unresolved_call_target_downgrades_no_path_found_to_unknown_not_unreachable():
+    # dead_code has zero *confident* callers, but something elsewhere calls an
+    # unverifiable `.execute()` - since dead_code also happens to define an `execute`
+    # method, we can't rule out that ambiguous call actually reaching it.
+    source = """
+from http.server import BaseHTTPRequestHandler
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        return helper()
+
+
+def helper():
+    return "reachable"
+
+
+class DeadCode:
+    def execute(self, query):
+        return query   # VULN, but only "reachable" via an unverifiable call
+
+
+def caller(connection, query):
+    return connection.execute(query)   # ambiguous - `connection` is untyped
+"""
+    graph = build_call_graph({"app.py": source})
+    assert "execute" in graph.unresolved_call_targets
+
+    finding = make_finding("app.py", _lineno_of_method(source, "DeadCode", "execute"), "unknown-2")
+    verdict = build_verdict(finding, graph)
+
+    assert verdict.status == "unknown"
+    assert verdict.confidence == "low"
+    assert verdict.entry_point is None
+    assert verdict.call_path is None
+
+
+def _lineno_of_method(source: str, class_name: str, method_name: str) -> int:
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for item in node.body:
+                if isinstance(item, ast.FunctionDef) and item.name == method_name:
+                    return item.body[0].lineno
+    raise AssertionError(f"{class_name}.{method_name} not found")
+
+
 def test_unparseable_file_is_skipped_not_fatal():
     """Uploaded code can be anything - a syntax error in one file shouldn't crash the scan."""
     good = "def add_todo(title):\n    pass\n"
