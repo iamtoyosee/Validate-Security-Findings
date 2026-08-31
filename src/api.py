@@ -88,9 +88,15 @@ def run_pipeline(codebase_path: Path) -> dict:
 async def scan(files: list[UploadFile]):
     temp_dir = Path(tempfile.mkdtemp())
     try:
-        # recreate the uploaded folder's relative structure on disk
+        # recreate the uploaded folder's relative structure on disk - resolve and
+        # verify containment first, since an unvalidated filename (e.g. "../../etc/x",
+        # or an absolute path, which Path.__truediv__ lets override the base entirely)
+        # would otherwise let a crafted upload write outside temp_dir.
+        temp_dir_resolved = temp_dir.resolve()
         for upload in files:
-            dest = temp_dir / upload.filename
+            dest = (temp_dir / upload.filename).resolve()
+            if not dest.is_relative_to(temp_dir_resolved):
+                raise HTTPException(status_code=400, detail="Invalid file path in upload.")
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(await upload.read())
 

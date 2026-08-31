@@ -40,6 +40,17 @@ def test_scan_todo_list_app_returns_three_findings_with_snippets():
         assert isinstance(f["code_snippet"], str)
 
 
+def test_scan_rejects_path_traversal_in_filename():
+    # A crafted filename escaping the temp dir (e.g. via ../../..) must not be allowed
+    # to write outside it - see api.py's containment check.
+    response = client.post(
+        "/api/scan",
+        files=[("files", ("../../../tmp/evil.py", b"x = 1", "text/x-python"))],
+    )
+    assert response.status_code == 400
+    assert "Invalid file path" in response.json()["detail"]
+
+
 def test_scan_oversized_codebase_returns_413():
     big_content = "\n".join(f"x = {i}" for i in range(6000)).encode()
 
