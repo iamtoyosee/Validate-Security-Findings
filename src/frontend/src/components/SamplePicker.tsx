@@ -8,23 +8,51 @@ interface SamplePickerProps {
   selectedId: string | null;
 }
 
+const RETRY_DELAY_MS = 4000;
+const MAX_ATTEMPTS = 15; // ~60s of retrying - covers a cold Render free-tier wake-up
+
 export function SamplePicker({ onSelect, loading, selectedId }: SamplePickerProps) {
   const [samples, setSamples] = useState<SampleApp[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    listSamples()
-      .then(setSamples)
-      .catch((err) => {
-        // Fails quietly in the UI (upload still works fine without samples), but log
-        // it - otherwise there's zero signal when this silently doesn't show up.
-        console.error("Could not load sample apps:", err);
-        setLoadError(err instanceof Error ? err.message : "Could not load sample apps.");
-      });
+    // A single fetch on mount used to fail permanently (and silently) if the backend
+    // was still cold-starting - samples would then never show up until a fresh reload
+    // happened to land after the backend had already woken up some other way. Retry
+    // instead, since "backend takes a while to wake up" is an expected, temporary state.
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tryLoad = (attemptNumber: number) => {
+      listSamples()
+        .then((result) => {
+          if (!cancelled) setSamples(result);
+        })
+        .catch((err) => {
+          console.error(`Could not load sample apps (attempt ${attemptNumber}):`, err);
+          if (cancelled) return;
+          if (attemptNumber >= MAX_ATTEMPTS) {
+            setGaveUp(true); // a real, non-transient failure - fail quietly, upload still works
+            return;
+          }
+          setAttempt(attemptNumber);
+          timer = setTimeout(() => tryLoad(attemptNumber + 1), RETRY_DELAY_MS);
+        });
+    };
+    tryLoad(1);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, []);
 
-  if (loadError) return null; // samples are a convenience, not core - fail quietly, upload still works
-  if (samples.length === 0) return null;
+  if (gaveUp) return null;
+
+  if (samples.length === 0) {
+    return attempt > 0 ? <p className="sample-picker-label">Waking up the sample apps…</p> : null;
+  }
 
   return (
     <div className="sample-picker">
