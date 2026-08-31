@@ -252,8 +252,8 @@ configs, not `auto`; removed for cleanliness. `src/adapters/rules/` (the pinned 
 files) has been deleted — nothing to maintain now.
 
 Findings-provided mode is kept, not as the demo's main experience, but because it
-mirrors the real production pattern (scanners → dedup → downstream validation) the user
-built at Netflix — worth having both, but self-scan is what gets featured.
+mirrors a common production pattern (scanners → dedup → downstream validation) seen in
+real security tooling — worth having both, but self-scan is what gets featured.
 
 ## Future / full-scale design: git URL + cloning (NOT built for MVP)
 
@@ -332,9 +332,9 @@ Request shape:
   separate, harder problem (different rule-id namespaces, genuinely needs fuzzy
   matching), see "Open questions."
 - **`vulnerability_type` is explicitly out of scope for this project, not deferred.** In
-  the real (Netflix-mirrored) architecture, a separate upstream dedup/normalization
-  service is responsible for turning multiple scanners' output into one consistent shape
-  before it ever reaches a downstream validator like this one. For this project,
+  many real architectures, a separate upstream dedup/normalization service is
+  responsible for turning multiple scanners' output into one consistent shape before it
+  ever reaches a downstream validator like this one. For this project,
   Semgrep-only *is* that already-normalized input — `vulnerability_type == rule_ids[0]`
   (the primary/first rule in a grouped location), unmodified, permanently within this
   project's scope, not a placeholder waiting for a second scanner to be added here.
