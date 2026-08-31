@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: agentic-validation-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT --app-dir src
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "*"   # tighten to the frontend's real URL once it exists - see README
+
+  - type: web
+    name: agentic-validation-frontend
+    env: static
+    rootDir: src/frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false   # set manually to the backend's URL once it's live - Vite bakes this in at build time

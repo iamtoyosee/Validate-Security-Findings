@@ -1,4 +1,5 @@
 import dataclasses
+import os
 import shutil
 import tempfile
 from pathlib import Path
@@ -13,9 +14,14 @@ from reachability.engine import build_call_graph, build_verdict
 
 app = FastAPI()
 
+# ALLOWED_ORIGINS: comma-separated list, e.g. "https://my-frontend.vercel.app". Falls
+# back to local dev defaults so `uvicorn api:app --reload` keeps working with no setup.
+_default_origins = "http://localhost:5173,http://127.0.0.1:5173"
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=allowed_origins,
     allow_methods=["POST"],
     allow_headers=["*"],
 )

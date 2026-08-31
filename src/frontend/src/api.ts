@@ -1,6 +1,9 @@
 import type { ScanResponse } from "./types";
 
-const SCAN_URL = "http://localhost:8000/api/scan";
+// VITE_API_URL: the deployed backend's base URL, e.g. "https://my-backend.onrender.com".
+// Falls back to localhost so `npm run dev` keeps working with no setup.
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const SCAN_URL = `${API_BASE}/api/scan`;
 
 /** POSTs the selected folder's files to the scan endpoint, preserving relative paths. */
 export async function scanCodebase(files: File[]): Promise<ScanResponse> {
