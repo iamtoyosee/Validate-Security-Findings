@@ -1,8 +1,44 @@
 import { useState } from "react";
 import type { Finding, ScanResponse } from "../types";
 
+// Display labels only - Semgrep's own severity words (ERROR/WARNING/INFO), relabeled
+// for a reader who isn't a Semgrep user. The underlying value and badge color are
+// unchanged; this only touches what's printed on screen.
+const SEVERITY_LABELS: Record<string, string> = {
+  ERROR: "Critical",
+  WARNING: "Medium",
+  INFO: "Low",
+};
+
+const SEVERITY_ORDER = ["Critical", "Medium", "Low"];
+
+function severityLabel(severity: string): string {
+  return SEVERITY_LABELS[severity.toUpperCase()] ?? severity;
+}
+
+function bySeverity(a: Finding, b: Finding): number {
+  return SEVERITY_ORDER.indexOf(severityLabel(a.severity)) - SEVERITY_ORDER.indexOf(severityLabel(b.severity));
+}
+
 function SeverityBadge({ severity }: { severity: string }) {
-  return <span className={`badge badge-${severity.toLowerCase()}`}>{severity}</span>;
+  return <span className={`badge badge-${severity.toLowerCase()}`}>{severityLabel(severity)}</span>;
+}
+
+function SeverityBreakdown({ findings }: { findings: Finding[] }) {
+  const counts = findings.reduce<Record<string, number>>((acc, f) => {
+    const label = severityLabel(f.severity);
+    acc[label] = (acc[label] ?? 0) + 1;
+    return acc;
+  }, {});
+  return (
+    <div className="severity-breakdown">
+      {SEVERITY_ORDER.map((label) => (
+        <span key={label} className={`severity-chip severity-chip-${label.toLowerCase()}`}>
+          <strong>{counts[label] ?? 0}</strong> {label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function FindingDetail({ finding, onClose }: { finding: Finding; onClose: () => void }) {
@@ -58,23 +94,34 @@ export function FindingsView({ result }: { result: ScanResponse }) {
         {result.raw_result_count} raw result{result.raw_result_count === 1 ? "" : "s"} grouped into{" "}
         {result.findings.length} distinct finding{result.findings.length === 1 ? "" : "s"}
       </p>
+      {result.findings.length > 0 && <SeverityBreakdown findings={result.findings} />}
       {result.findings.length === 0 ? (
         <p>No findings.</p>
       ) : (
-        <ul className="findings-list">
-          {result.findings.map((f) => (
-            <li key={f.finding_id}>
-              <button type="button" className="finding-row" onClick={() => setSelected(f)}>
-                <span className="finding-location">
-                  {f.file_path}:{f.line_start}
-                </span>
-                <SeverityBadge severity={f.severity} />
-                <span className="finding-message">{f.message}</span>
-                <span className="finding-cwe">{f.cwe.join(", ")}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="finding-row finding-row-findings finding-row-header" aria-hidden="true">
+            <span>Location</span>
+            <span>Severity</span>
+            <span>Message</span>
+            <span>CWE</span>
+            <span />
+          </div>
+          <ul className="findings-list">
+            {[...result.findings].sort(bySeverity).map((f) => (
+              <li key={f.finding_id}>
+                <button type="button" className="finding-row finding-row-findings" onClick={() => setSelected(f)}>
+                  <span className="finding-location">
+                    {f.file_path}:{f.line_start}
+                  </span>
+                  <SeverityBadge severity={f.severity} />
+                  <span className="finding-message">{f.message}</span>
+                  <span className="finding-cwe">{f.cwe.join(", ")}</span>
+                  <span className="finding-chevron" aria-hidden="true">›</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   );

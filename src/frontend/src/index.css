@@ -16,8 +16,13 @@
   --status-reachable: #15803d;
   --status-unreachable: #6b7280;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --funnel-raw: #8a8591;
+  --funnel-distinct: var(--accent);
+  --funnel-reachable: #d97706;
+  --funnel-exploitable: #dc2626;
+
+  --sans: 'IBM Plex Sans', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
 
   font: 16px/145% var(--sans);
   color-scheme: light dark;
@@ -43,6 +48,11 @@
     --sev-info: #60a5fa;
     --status-reachable: #4ade80;
     --status-unreachable: #9ca3af;
+
+    --funnel-raw: #9a94a3;
+    --funnel-distinct: var(--accent);
+    --funnel-reachable: #f5a524;
+    --funnel-exploitable: #ff6b6b;
   }
 }
 

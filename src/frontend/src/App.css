@@ -1,41 +1,128 @@
 .app {
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 56px 20px 64px;
 }
 
 header h1 {
-  font-size: 28px;
-  margin: 0 0 4px;
+  font-size: 30px;
+  margin: 0 0 6px;
 }
 
 .subtitle {
-  margin: 0 0 20px;
+  margin: 0 0 28px;
+}
+
+.summary-card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-alt);
+  margin-bottom: 24px;
 }
 
 .upload-panel {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-alt);
+  gap: 14px;
+  padding: 20px;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  background: var(--bg);
   flex-wrap: wrap;
 }
 
 .upload-panel button {
-  padding: 8px 16px;
+  padding: 9px 18px;
   border-radius: 6px;
   border: 1px solid var(--border);
-  background: var(--bg);
+  background: var(--bg-alt);
   color: var(--text-h);
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.upload-panel button:not(:disabled):hover {
+  border-color: var(--accent);
 }
 
 .upload-panel button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.sample-picker-label {
+  font-size: 13px;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+.sample-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.sample-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.sample-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.sample-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sample-card-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.sample-card-name {
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.sample-card-description {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 16px 0;
+}
+
+.or-divider::before,
+.or-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
 }
 
 .scan-button {
@@ -48,6 +135,32 @@ header h1 {
 .upload-status {
   color: var(--text);
   font-size: 14px;
+}
+
+.scan-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-size: 14px;
+}
+
+.scan-spinner {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent-bg);
+  border-top-color: var(--accent);
+  animation: scan-spin 0.8s linear infinite;
+}
+
+@keyframes scan-spin {
+  to { transform: rotate(360deg); }
 }
 
 .error-banner {
@@ -96,37 +209,232 @@ main {
   margin-bottom: 12px;
 }
 
+.severity-breakdown {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.severity-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.severity-chip strong {
+  font-size: 14px;
+  color: var(--text-h);
+}
+
+.severity-chip-critical strong { color: var(--sev-error); }
+.severity-chip-medium strong { color: var(--sev-warning); }
+.severity-chip-low strong { color: var(--sev-info); }
+
+.stat-card {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  border: 1px solid var(--border);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.funnel {
+  display: flex;
+  align-items: flex-start;
+  margin: 24px 0 4px;
+  overflow-x: auto;
+}
+
+.funnel-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 4px;
+}
+
+.funnel-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--funnel-distinct);
+  background: color-mix(in srgb, var(--funnel-distinct) 12%, transparent);
+  color: var(--text-h);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Each stage gets its own hue - a deliberate cool-to-warm progression (undifferentiated
+   noise -> processed -> urgent -> critical), not a decorative rainbow. */
+.funnel-step-raw .funnel-circle {
+  border-color: var(--funnel-raw);
+  background: color-mix(in srgb, var(--funnel-raw) 12%, transparent);
+}
+
+.funnel-step-reachable .funnel-circle {
+  border-color: var(--funnel-reachable);
+  background: color-mix(in srgb, var(--funnel-reachable) 14%, transparent);
+}
+
+.funnel-step-exploitable .funnel-circle {
+  border-color: var(--funnel-exploitable);
+  background: color-mix(in srgb, var(--funnel-exploitable) 14%, transparent);
+}
+
+/* Reserved for when exploitability is real (see ScanFunnel.tsx) - a pulsing ring to
+   draw the eye, since this is the stage that means "act now." */
+.funnel-step-urgent .funnel-circle {
+  animation: funnel-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes funnel-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--funnel-exploitable) 45%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--funnel-exploitable) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .funnel-step-urgent .funnel-circle {
+    animation: none;
+  }
+}
+
+.funnel-step:hover .funnel-circle {
+  transform: scale(1.07);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.funnel-step-label {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.funnel-step-pending .funnel-circle {
+  border: 2px dashed var(--border);
+  background: none;
+  color: var(--text);
+  font-size: 20px;
+}
+
+.funnel-line {
+  flex: 1;
+  position: relative;
+  height: 2px;
+  background: var(--border);
+  margin: 27px 6px 0;
+  min-width: 32px;
+}
+
+.funnel-line-label {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  white-space: nowrap;
+  background: var(--bg);
+  padding: 0 6px;
+}
+
 .findings-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .finding-row {
   width: 100%;
   text-align: left;
   display: grid;
-  grid-template-columns: minmax(160px, auto) auto 1fr auto;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-alt);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: none;
   cursor: pointer;
   color: var(--text-h);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+/* Fixed pixel widths, not auto/minmax - each row is its own independent grid (there's
+   no shared table element), so a content-sized column computes a different width on
+   every row depending on that row's own text length, and nothing lines up between
+   rows. Fixed widths make every row (and the header) compute the identical grid. */
+.finding-row-findings { grid-template-columns: 340px 92px 1fr 88px 20px; }
+.finding-row-reachability { grid-template-columns: 340px 118px 1fr 20px; }
+
+.finding-row-header {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.findings-list li:last-child .finding-row {
+  border-bottom: none;
 }
 
 .finding-row:hover {
-  border-color: var(--accent);
+  background: var(--bg-alt);
+  transform: translateX(2px);
+}
+
+.finding-chevron {
+  font-size: 18px;
+  color: var(--border);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.finding-row:hover .finding-chevron {
+  color: var(--accent);
+  transform: translateX(2px);
 }
 
 .finding-location {
   font-family: var(--mono);
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .finding-message {

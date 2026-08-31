@@ -62,34 +62,56 @@ export function ReachabilityView({ result }: { result: ScanResponse }) {
     }
   }
 
+  const total = result.reachability.length;
   const reachableCount = result.reachability.filter((v) => v.status === "reachable").length;
+  const reachablePct = total === 0 ? 0 : Math.round((reachableCount / total) * 100);
 
   return (
     <div className="findings-view">
+      {total > 0 && (
+        <div className="stat-card">
+          <span className="stat-value">{reachablePct}%</span>
+          <span className="stat-label">
+            of findings are actually reachable ({reachableCount} of {total}) — the rest can wait
+          </span>
+        </div>
+      )}
       <p className="findings-summary">
-        {result.reachability.length} finding{result.reachability.length === 1 ? "" : "s"} analyzed,{" "}
-        {reachableCount} reachable
+        {total} finding{total === 1 ? "" : "s"} analyzed, {reachableCount} reachable
       </p>
       {result.reachability.length === 0 ? (
         <p>No findings to analyze.</p>
       ) : (
-        <ul className="findings-list">
-          {result.reachability.map((v) => {
-            const finding = findingsById.get(v.finding_id);
-            if (!finding) return null;
-            return (
-              <li key={v.finding_id}>
-                <button type="button" className="finding-row" onClick={() => setSelectedId(v.finding_id)}>
-                  <span className="finding-location">
-                    {finding.file_path}:{finding.line_start}
-                  </span>
-                  <StatusBadge status={v.status} />
-                  <span className="finding-message">{v.reason}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="finding-row finding-row-reachability finding-row-header" aria-hidden="true">
+            <span>Location</span>
+            <span>Status</span>
+            <span>Reason</span>
+            <span />
+          </div>
+          <ul className="findings-list">
+            {result.reachability.map((v) => {
+              const finding = findingsById.get(v.finding_id);
+              if (!finding) return null;
+              return (
+                <li key={v.finding_id}>
+                  <button
+                    type="button"
+                    className="finding-row finding-row-reachability"
+                    onClick={() => setSelectedId(v.finding_id)}
+                  >
+                    <span className="finding-location">
+                      {finding.file_path}:{finding.line_start}
+                    </span>
+                    <StatusBadge status={v.status} />
+                    <span className="finding-message">{v.reason}</span>
+                    <span className="finding-chevron" aria-hidden="true">›</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   );

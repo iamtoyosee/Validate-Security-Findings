@@ -1,9 +1,12 @@
 import { useState } from "react";
 import "./App.css";
-import { scanCodebase } from "./api";
+import { scanCodebase, scanSample } from "./api";
 import { FindingsView } from "./components/FindingsView";
 import { Placeholder } from "./components/Placeholder";
 import { ReachabilityView } from "./components/ReachabilityView";
+import { SamplePicker } from "./components/SamplePicker";
+import { ScanFunnel } from "./components/ScanFunnel";
+import { ScanProgress } from "./components/ScanProgress";
 import { UploadPanel } from "./components/UploadPanel";
 import type { ScanResponse } from "./types";
 
@@ -15,12 +18,28 @@ function App() {
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [result, setResult] = useState<ScanResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
 
   const handleScan = async (files: File[]) => {
+    setSelectedSampleId(null);
     setStatus("loading");
     setError(null);
     try {
       const response = await scanCodebase(files);
+      setResult(response);
+      setStatus("success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unexpected error during scan.");
+      setStatus("error");
+    }
+  };
+
+  const handleSelectSample = async (sampleId: string) => {
+    setSelectedSampleId(sampleId);
+    setStatus("loading");
+    setError(null);
+    try {
+      const response = await scanSample(sampleId);
       setResult(response);
       setStatus("success");
     } catch (err) {
@@ -36,13 +55,20 @@ function App() {
         <p className="subtitle">Upload a codebase to scan it for findings.</p>
       </header>
 
-      <UploadPanel onScan={handleScan} loading={status === "loading"} />
+      <div className="summary-card">
+        <SamplePicker onSelect={handleSelectSample} loading={status === "loading"} selectedId={selectedSampleId} />
+        <p className="or-divider">or upload your own</p>
+        <UploadPanel onScan={handleScan} loading={status === "loading"} />
+        {status === "loading" && <ScanProgress />}
 
-      {status === "error" && error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
+        {status === "error" && error && (
+          <div className="error-banner" role="alert">
+            {error}
+          </div>
+        )}
+
+        {result && <ScanFunnel result={result} onNavigate={setTab} />}
+      </div>
 
       <nav className="tabs">
         <button type="button" className={tab === "findings" ? "active" : ""} onClick={() => setTab("findings")}>

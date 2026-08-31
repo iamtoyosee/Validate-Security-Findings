@@ -25,6 +25,12 @@ export interface ReachabilityVerdict {
   reason: string;
 }
 
+export interface SampleApp {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface ScanResponse {
   raw_result_count: number;
   findings: Finding[];
