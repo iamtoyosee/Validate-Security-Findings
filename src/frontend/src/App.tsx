@@ -51,8 +51,8 @@ function App() {
   return (
     <div className="app">
       <header>
-        <h1>Agentic Vulnerability Validation</h1>
-        <p className="subtitle">Upload a codebase to scan it for findings.</p>
+        <h1>Validate your security findings</h1>
+        <p className="subtitle">So you can focus on the findings that matter most.</p>
       </header>
 
       <div className="summary-card">
