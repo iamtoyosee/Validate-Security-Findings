@@ -299,6 +299,120 @@ def test_celery_task_verdicts(function_name, expected_status, expected_entry):
     assert_verdict_matches(verdict, function_name, expected_status, expected_entry)
 
 
+# ---- Fix 5: attribute-style @X.task requires a real loading channel once >1 app exists ----
+# Same shape as the real celery_reachability_lab fixture: a wired-up app with `include=`
+# and an orphan app with none, full pipeline (build_call_graph + build_verdict).
+
+CELERY_APP_SOURCE = """
+from celery import Celery
+
+celery_app = Celery("worker", broker="memory://", include=["celery_tasks"])
+"""
+
+CELERY_TASKS_SOURCE = """
+from celery_app import celery_app
+
+@celery_app.task
+def do_work(payload):
+    return f"working on {payload}"
+"""
+
+CELERY_ORPHAN_SOURCE = """
+from celery import Celery
+
+orphan_app = Celery("retired_worker", broker="memory://")
+
+@orphan_app.task
+def orphan_work(payload):
+    return f"orphaned {payload}"
+"""
+
+
+def two_app_celery_graph():
+    return build_call_graph({
+        "celery_app.py": CELERY_APP_SOURCE,
+        "celery_tasks.py": CELERY_TASKS_SOURCE,
+        "orphan_tasks.py": CELERY_ORPHAN_SOURCE,
+    })
+
+
+def test_celery_task_trusted_via_apps_own_include_when_multiple_apps_exist():
+    finding = make_finding("celery_tasks.py", _lineno_of(CELERY_TASKS_SOURCE, "do_work"), "celery-multi-1")
+    verdict = build_verdict(finding, two_app_celery_graph())
+    assert_verdict_matches(verdict, "do_work", "reachable", "do_work")
+
+
+def test_celery_task_on_unwired_app_is_unreachable_when_multiple_apps_exist():
+    finding = make_finding("orphan_tasks.py", _lineno_of(CELERY_ORPHAN_SOURCE, "orphan_work"), "celery-multi-2")
+    verdict = build_verdict(finding, two_app_celery_graph())
+    assert_verdict_matches(verdict, "orphan_work", "unreachable", None)
+
+
+def test_celery_single_app_task_trusted_with_no_include_at_all():
+    # Regression: the common single-app shape, no include= needed, must stay trusted.
+    source = """
+from celery import Celery
+
+app = Celery("worker", broker="memory://")
+
+@app.task
+def process(payload):
+    return f"processing {payload}"
+"""
+    graph = build_call_graph({"worker.py": source})
+    finding = make_finding("worker.py", _lineno_of(source, "process"), "celery-single-1")
+    verdict = build_verdict(finding, graph)
+    assert_verdict_matches(verdict, "process", "reachable", "process")
+
+
+CELERY_AUTODISCOVER_SOURCE = """
+from celery import Celery
+
+discovered_app = Celery("discovered_worker", broker="memory://")
+discovered_app.autodiscover_tasks(["discovered_tasks"])
+
+@discovered_app.task
+def discovered_work(payload):
+    return f"discovered {payload}"
+"""
+
+
+def test_celery_task_trusted_via_autodiscover_tasks_presence():
+    graph = build_call_graph({
+        "celery_app.py": CELERY_APP_SOURCE,
+        "celery_tasks.py": CELERY_TASKS_SOURCE,
+        "discovered_app.py": CELERY_AUTODISCOVER_SOURCE,
+    })
+    finding = make_finding(
+        "discovered_app.py", _lineno_of(CELERY_AUTODISCOVER_SOURCE, "discovered_work"), "celery-multi-3"
+    )
+    verdict = build_verdict(finding, graph)
+    assert_verdict_matches(verdict, "discovered_work", "reachable", "discovered_work")
+
+
+CELERY_OTHER_APP_SOURCE = """
+from celery import Celery
+
+other_app = Celery("other_worker", broker="memory://")
+
+@other_app.task
+def other_work(payload):
+    return f"other {payload}"
+"""
+
+
+def test_celery_task_trusted_via_plain_import_elsewhere_rather_than_include():
+    graph = build_call_graph({
+        "celery_app.py": CELERY_APP_SOURCE,
+        "celery_tasks.py": CELERY_TASKS_SOURCE,
+        "other_tasks.py": CELERY_OTHER_APP_SOURCE,
+        "startup.py": "import other_tasks\n",
+    })
+    finding = make_finding("other_tasks.py", _lineno_of(CELERY_OTHER_APP_SOURCE, "other_work"), "celery-multi-4")
+    verdict = build_verdict(finding, graph)
+    assert_verdict_matches(verdict, "other_work", "reachable", "other_work")
+
+
 # ---- unknown vs unreachable: the two situations "no path found" used to conflate ----
 
 def test_genuinely_zero_callers_stays_unreachable_medium_confidence():

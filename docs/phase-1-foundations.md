@@ -495,3 +495,75 @@ Verified against all 10 of `salary_reachability_lab`'s documented ground-truth
 `file:line` findings (both apps' original 12 ground-truth findings unaffected) — 10/10
 correct, reachable and unreachable alike, tracing the exact call chains through routers,
 module-qualified calls, a locally-instantiated class, and a background task.
+
+## Post-launch update: an orphan Celery app was wrongly trusted, same class of bug as Fix 1
+
+A fourth real, hand-built app (`celery_reachability_lab`, 6 reachable + 6 unreachable
+ground-truth findings) surfaced the Celery equivalent of Fix 1's unmounted-router bug.
+`detect_celery_entry_points()` matched `@X.task(...)` on decorator shape alone, with no
+check on whether `X`'s app is ever actually wired up to load the file the decorated
+function lives in. The app has `celery_app.py` (`celery_app = Celery(..., include=
+["tasks"])`, six real tasks in `tasks.py`) alongside `orphan_tasks.py` (`orphan_app =
+Celery("retired_worker", broker="memory://")`, no `include=`, two tasks nothing ever
+loads) — the detector trusted both, wrongly marking the orphan's two tasks reachable.
+
+**The fix applies only to attribute-style decorators (`@X.task`).** Bare `@task`/
+`@shared_task` stays unconditionally trusted, unchanged - Celery's own bare decorator is
+intentionally app-agnostic, not a per-app registration.
+
+For `@X.task`, `X` is resolved back to its `Celery(...)` instantiation the same way Fix
+1 resolves a mounted router's alias - same file, or via `build_import_table()` if
+imported. Then:
+
+1. **If it's the only `Celery(...)` instance anywhere in the codebase**, trust
+   unconditionally - the common single-app case, which often has no `include=` at all,
+   must keep working exactly as before this fix.
+2. **If `X` can't be resolved to any tracked instance at all**, also trust
+   unconditionally - same default as an unrecognized `app`/`api` object in Fix 1: we
+   never try to verify what we can't identify.
+3. **Otherwise** (two or more tracked `Celery(...)` instances, and `X` is one of them), a
+   decorated function counts as an entry point only if its own file is reachable through
+   a real, verifiable loading channel:
+   - named in `X`'s own `include=[...]` (a list of module name strings - `"tasks"` →
+     `tasks.py`, `"app.tasks"` → `app/tasks.py`, the same module→file conversion Python's
+     own import system uses), or
+   - `X.autodiscover_tasks(...)` appears anywhere in the codebase - presence alone is
+     treated as a real, explicit configuration signal, not something resolved further
+     (attempting to reason about what it actually discovers would be a guess, the
+     opposite of this project's whole approach), or
+   - the file is plainly imported anywhere else in the codebase, checked across every
+     file's own imports, not just one (same codebase-wide scope `build_import_table`
+     already uses).
+
+   If none hold, the function is confidently **not** an entry point - no `unknown`
+   fallback here. Unlike an ambiguous `.execute()` call, whether a file is named in an
+   `include=` list or plainly imported is a structural fact straight out of the AST, the
+   same certainty class as every other confident edge this project builds.
+
+**A fourth candidate channel was deliberately left out: "same file as `X`'s own
+instantiation."** It reads like a real signal - plenty of small real Celery apps put the
+app object and its tasks in one file - but it isn't independently verifiable, and
+implementing it as an unconditional pass would have silently re-admitted the exact bug
+being fixed: `orphan_app`'s two tasks live in the very file that instantiates it
+(`orphan_tasks.py`), with no `include=`, no `autodiscover_tasks`, and no import from
+anywhere else. A "same file" free pass would have called that reachable again. Worked
+through by hand: whenever "same file" is legitimately true, it's already exactly the
+plain-import check above the moment anything actually needs that file (as `tasks.py`
+needing `celery_app.py`'s `celery_app` object already makes `celery_app.py` importable-
+elsewhere in this very app) - and when nothing does, "same file" is indistinguishable
+from guessing that this particular `Celery()` call happens to be the one some worker's
+`-A` flag points at, which is exactly the ambiguity below, not a resolved fact.
+
+**Documented, deliberately unsolved limitation**: even once a Celery app's file is
+confirmed loaded through one of the three channels above, there is no source-level way
+to tell whether that specific app is ever actually run as a worker versus only used as a
+client to send tasks to some other worker - `-A <module>` is a deployment-time CLI
+argument, not something any Python source file states. Not solved here, recorded as an
+open question rather than guessed at.
+
+Verified against all 12 of `celery_reachability_lab`'s documented ground-truth
+`file:line` findings (all three earlier apps' 22 ground-truth findings unaffected) -
+12/12 correct: the six real tasks' full call chains (task → service → repository, task →
+locally-instantiated class, task → service) all reachable, `orphan_app`'s two tasks
+correctly unreachable, and `legacy_jobs.py`'s four zero-caller functions (unrelated to
+this fix) still correctly unreachable. 85/85 tests pass, zero regressions.

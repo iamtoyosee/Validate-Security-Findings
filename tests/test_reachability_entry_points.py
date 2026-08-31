@@ -179,3 +179,156 @@ def not_a_task():
     entry_points = detect_celery_entry_points(trees)
     assert entry_points == {"process_upload", "send_email", "cleanup"}
     assert "not_a_task" not in entry_points
+
+
+# ---- Fix 5: an attribute-style @X.task on an app never wired up isn't an entry point ----
+
+def test_celery_detector_trusts_single_app_attribute_style_tasks_with_no_include():
+    # Regression: the common single-app shape, often with no include= at all - must stay
+    # trusted exactly as before this fix.
+    source = """
+from celery import Celery
+
+app = Celery("worker", broker="memory://")
+
+@app.task
+def process(payload):
+    pass
+"""
+    trees = {"worker.py": ast.parse(source)}
+    assert detect_celery_entry_points(trees) == {"process"}
+
+
+def test_celery_detector_excludes_attribute_style_tasks_on_an_app_with_no_loading_channel():
+    real_app_source = """
+from celery import Celery
+
+real_app = Celery("real_worker", broker="memory://", include=["real_tasks"])
+"""
+    real_tasks_source = """
+from celery_app import real_app
+
+@real_app.task
+def do_work(payload):
+    pass
+"""
+    orphan_source = """
+from celery import Celery
+
+orphan_app = Celery("retired_worker", broker="memory://")
+
+@orphan_app.task
+def orphan_work(payload):
+    pass
+"""
+    trees = {
+        "celery_app.py": ast.parse(real_app_source),
+        "real_tasks.py": ast.parse(real_tasks_source),
+        "orphan_tasks.py": ast.parse(orphan_source),
+    }
+    entry_points = detect_celery_entry_points(trees)
+    assert "do_work" in entry_points            # trusted via real_app's include=
+    assert "orphan_work" not in entry_points    # orphan_app has no loading channel at all
+
+
+def test_celery_detector_matches_include_despite_a_directory_prefix_on_file_paths():
+    # Regression: uploading a whole project folder stores paths as
+    # "myproject/real_tasks.py", not "real_tasks.py" - include=["real_tasks"] must still
+    # match. This broke the very first version of the fix: an exact `file_path ==
+    # module_to_file(...)` check found zero matches for every file once paths carried any
+    # directory prefix, silently excluding every real Celery task, not just orphaned ones.
+    real_app_source = """
+from celery import Celery
+
+real_app = Celery("real_worker", broker="memory://", include=["real_tasks"])
+"""
+    real_tasks_source = """
+from celery_app import real_app
+
+@real_app.task
+def do_work(payload):
+    pass
+"""
+    orphan_source = """
+from celery import Celery
+
+orphan_app = Celery("retired_worker", broker="memory://")
+
+@orphan_app.task
+def orphan_work(payload):
+    pass
+"""
+    trees = {
+        "myproject/celery_app.py": ast.parse(real_app_source),
+        "myproject/real_tasks.py": ast.parse(real_tasks_source),
+        "myproject/orphan_tasks.py": ast.parse(orphan_source),
+    }
+    entry_points = detect_celery_entry_points(trees)
+    assert "do_work" in entry_points
+    assert "orphan_work" not in entry_points
+
+
+def test_celery_detector_trusts_second_app_via_autodiscover_tasks_presence():
+    real_app_source = """
+from celery import Celery
+
+real_app = Celery("real_worker", broker="memory://", include=["real_tasks"])
+"""
+    real_tasks_source = """
+from celery_app import real_app
+
+@real_app.task
+def do_work(payload):
+    pass
+"""
+    discovered_source = """
+from celery import Celery
+
+discovered_app = Celery("discovered_worker", broker="memory://")
+discovered_app.autodiscover_tasks(["discovered_tasks"])
+
+@discovered_app.task
+def discovered_work(payload):
+    pass
+"""
+    trees = {
+        "celery_app.py": ast.parse(real_app_source),
+        "real_tasks.py": ast.parse(real_tasks_source),
+        "discovered_app.py": ast.parse(discovered_source),
+    }
+    entry_points = detect_celery_entry_points(trees)
+    assert "discovered_work" in entry_points   # trusted via autodiscover_tasks() presence alone
+
+
+def test_celery_detector_trusts_second_app_via_plain_import_elsewhere():
+    real_app_source = """
+from celery import Celery
+
+real_app = Celery("real_worker", broker="memory://", include=["real_tasks"])
+"""
+    real_tasks_source = """
+from celery_app import real_app
+
+@real_app.task
+def do_work(payload):
+    pass
+"""
+    other_app_source = """
+from celery import Celery
+
+other_app = Celery("other_worker", broker="memory://")
+
+@other_app.task
+def other_work(payload):
+    pass
+"""
+    # Nothing in other_app's own config names this file - it's only reachable because some
+    # unrelated module plainly imports it.
+    trees = {
+        "celery_app.py": ast.parse(real_app_source),
+        "real_tasks.py": ast.parse(real_tasks_source),
+        "other_tasks.py": ast.parse(other_app_source),
+        "startup.py": ast.parse("import other_tasks\n"),
+    }
+    entry_points = detect_celery_entry_points(trees)
+    assert "other_work" in entry_points   # trusted via plain `import other_tasks` elsewhere
