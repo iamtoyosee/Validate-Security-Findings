@@ -37,9 +37,10 @@ and an open question about Semgrep firing two rules per location (6 raw results 
 | 2 | Reachability hardening: confidence scoring, more entry-point types, benchmark suite | Not started | — |
 | 3 | Taint/dataflow filter: is attacker input actually reaching the sink, not just control flow | Not started | — |
 | 4/5 | Exploitability, split in two tiers — **Tier A**: static/LLM-reasoning judgment over the reachability path + code + taint signal, no sandbox, safe to run against any user-provided codebase, ships as part of MVP. **Tier B**: dynamic sandboxed confirmation (actually run + attack the target app) — scoped to controlled fixture apps only, never exposed on the arbitrary-URL path; a stretch goal, partial/imperfect is fine, purpose is to learn and document strategy/blockers, not to ship complete | Not started | [docs/phase-4-5-exploitability-notes.md](docs/phase-4-5-exploitability-notes.md) |
-| 6 | Prioritization & reporting: rank by evidence strength, inspectable trail, human override | Not started | — |
-| 7 | Scale: more languages, scanners, frameworks | Not started | — |
-| 8 | Continuous validation: diff-aware re-validation on new commits | Not started | — |
+| 6 | Local CLI mode: package the engine as a standalone tool run on the user's own machine (scan runs client-side, only the results JSON — no source code — ever reaches the web viewer) | Not started, planned after Phase 4/5 progress | — |
+| 7 | Prioritization & reporting: rank by evidence strength, inspectable trail, human override | Not started | — |
+| 8 | Scale: more languages, scanners, frameworks | Not started | — |
+| 9 | Continuous validation: diff-aware re-validation on new commits | Not started | — |
 
 See [docs/project-design.md](docs/project-design.md) for goal/scope/constraints and
 [docs/prior-art.md](docs/prior-art.md) for researched open-source and academic reference
