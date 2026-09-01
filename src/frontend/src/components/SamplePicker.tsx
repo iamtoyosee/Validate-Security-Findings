@@ -9,18 +9,19 @@ interface SamplePickerProps {
 }
 
 const RETRY_DELAY_MS = 4000;
-const MAX_ATTEMPTS = 15; // ~60s of retrying - covers a cold Render free-tier wake-up
 
 export function SamplePicker({ onSelect, loading, selectedId }: SamplePickerProps) {
   const [samples, setSamples] = useState<SampleApp[]>([]);
-  const [gaveUp, setGaveUp] = useState(false);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     // A single fetch on mount used to fail permanently (and silently) if the backend
-    // was still cold-starting - samples would then never show up until a fresh reload
-    // happened to land after the backend had already woken up some other way. Retry
-    // instead, since "backend takes a while to wake up" is an expected, temporary state.
+    // was cold-starting. A capped retry (originally 60s) turned out to still give up
+    // before some cold starts finish - the backend would then only get woken up by an
+    // unrelated action (an upload has no such timeout), matching exactly "works after
+    // I upload something." Retry indefinitely instead: there's no real cost to quietly
+    // polling every few seconds while someone's on the page, and it removes the failure
+    // mode entirely rather than just widening the window and hoping it's enough.
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -32,10 +33,6 @@ export function SamplePicker({ onSelect, loading, selectedId }: SamplePickerProp
         .catch((err) => {
           console.error(`Could not load sample apps (attempt ${attemptNumber}):`, err);
           if (cancelled) return;
-          if (attemptNumber >= MAX_ATTEMPTS) {
-            setGaveUp(true); // a real, non-transient failure - fail quietly, upload still works
-            return;
-          }
           setAttempt(attemptNumber);
           timer = setTimeout(() => tryLoad(attemptNumber + 1), RETRY_DELAY_MS);
         });
@@ -47,8 +44,6 @@ export function SamplePicker({ onSelect, loading, selectedId }: SamplePickerProp
       clearTimeout(timer);
     };
   }, []);
-
-  if (gaveUp) return null;
 
   if (samples.length === 0) {
     return attempt > 0 ? <p className="sample-picker-label">Waking up the sample apps…</p> : null;

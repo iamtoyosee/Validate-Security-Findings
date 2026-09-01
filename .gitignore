@@ -1,7 +1,18 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
-.DS_Store
+
 node_modules/
 dist/
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+
+# IDE / OS
+.vscode/
+.DS_Store
