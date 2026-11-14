@@ -1,0 +1,105 @@
+{
+  "app": "ecommerce-app",
+  "description": "Flask shop. Mirrors ground_truth.md.",
+  "findings": [
+    {
+      "id": "find_products",
+      "file": "app.py",
+      "line": 76,
+      "function": "find_products",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "home",
+      "exploitability": "exploitable",
+      "why": "GET /?q= is formatted into the query."
+    },
+    {
+      "id": "verify_account",
+      "file": "app.py",
+      "line": 84,
+      "function": "verify_account",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "login",
+      "exploitability": "exploitable",
+      "why": "POST /login email/password are formatted into the query."
+    },
+    {
+      "id": "stock_message",
+      "file": "app.py",
+      "line": 91,
+      "function": "stock_message",
+      "cwe": "CWE-78",
+      "reachability": "reachable",
+      "entry_point": "inventory",
+      "exploitability": "exploitable",
+      "why": "GET /inventory?sku= is formatted into a shell command."
+    },
+    {
+      "id": "promotion_message",
+      "file": "app.py",
+      "line": 95,
+      "function": "promotion_message",
+      "cwe": "CWE-96",
+      "reachability": "reachable",
+      "entry_point": "promotion",
+      "exploitability": "exploitable",
+      "why": "GET /promotion?message= is concatenated into a template that is then rendered."
+    },
+    {
+      "id": "receipt_text",
+      "file": "app.py",
+      "line": 100,
+      "function": "receipt_text",
+      "cwe": "CWE-22",
+      "reachability": "reachable",
+      "entry_point": "receipt",
+      "exploitability": "exploitable",
+      "why": "GET /receipt?name= is joined onto a directory and read, with no containment check."
+    },
+    {
+      "id": "review_text",
+      "file": "app.py",
+      "line": 104,
+      "function": "review_text",
+      "cwe": "CWE-79",
+      "reachability": "reachable",
+      "entry_point": "product",
+      "exploitability": "exploitable",
+      "why": "Stored XSS: review text saved from a POST form is later wrapped in Markup() unescaped. Second-order - the value passes through the database."
+    },
+    {
+      "id": "calculate_adjustment",
+      "file": "app.py",
+      "line": 115,
+      "function": "calculate_adjustment",
+      "cwe": "CWE-95",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Defined but never called."
+    },
+    {
+      "id": "restore_preferences",
+      "file": "app.py",
+      "line": 119,
+      "function": "restore_preferences",
+      "cwe": "CWE-502",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Defined but never called."
+    },
+    {
+      "id": "fetch_partner_feed",
+      "file": "app.py",
+      "line": 123,
+      "function": "fetch_partner_feed",
+      "cwe": "CWE-918",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Defined but never called."
+    }
+  ]
+}

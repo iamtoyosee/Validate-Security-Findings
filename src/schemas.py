@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 
@@ -28,6 +28,12 @@ class ReachabilityVerdict:
     entry_point: Optional[str]            # e.g. "POST /upload -> handle_upload"
     call_path: Optional[list[str]]        # structured/technical - kept for Tier A input & debugging
     reason: str                           # one sentence, natural language, no jargon - see decision below
+    # Phase 2 additions - all optional, so Phase 1 callers and stored results still load.
+    entry_point_kind: Optional[str] = None     # "http" | "task" | "cli" | "startup"
+    entry_point_label: Optional[str] = None    # human form of the way in: "GET /salary/employees"
+    entry_guards: list[str] = field(default_factory=list)   # auth-looking decorators on the entry point
+    call_path_locations: list[dict] = field(default_factory=list)   # [{function, file_path, line}] per hop
+    other_entry_points: list[str] = field(default_factory=list)     # labels of further ways in, if any
 
 
 @dataclass(frozen=True)

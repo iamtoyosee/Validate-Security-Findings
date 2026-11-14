@@ -9,7 +9,7 @@ from reachability.entry_points import (
 )
 
 TODO_APP = (Path(__file__).parent.parent / "src" / "sample-apps" / "todo-list-app" / "app.py").read_text()
-ECOMMERCE_APP = Path("/Users/ausman/Workload/Ecommerce-app/app.py").read_text()
+ECOMMERCE_APP = (Path(__file__).parent.parent / "src" / "sample-apps" / "ecommerce-app" / "app.py").read_text()
 
 
 def test_http_server_detector_tags_do_get_and_do_post_on_the_real_todo_app():

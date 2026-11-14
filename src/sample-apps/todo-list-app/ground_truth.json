@@ -1,0 +1,39 @@
+{
+  "app": "todo-list-app",
+  "description": "http.server todo app. Answer key written by reading the code, independent of any tool output.",
+  "findings": [
+    {
+      "id": "add_todo",
+      "file": "app.py",
+      "line": 34,
+      "function": "add_todo",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "TodoHandler.do_POST",
+      "exploitability": "exploitable",
+      "why": "POST /add form field `title` is formatted into an INSERT."
+    },
+    {
+      "id": "search_todos",
+      "file": "app.py",
+      "line": 39,
+      "function": "search_todos",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "TodoHandler.do_GET",
+      "exploitability": "exploitable",
+      "why": "GET /?q= is formatted into a LIKE query."
+    },
+    {
+      "id": "find_old_todos",
+      "file": "app.py",
+      "line": 94,
+      "function": "find_old_todos",
+      "cwe": "CWE-89",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Defined but never called."
+    }
+  ]
+}

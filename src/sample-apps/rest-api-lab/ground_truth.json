@@ -1,0 +1,138 @@
+{
+  "app": "rest-api-lab",
+  "description": "Layered FastAPI app: routes -> services -> repository, plus one router that is never mounted and one module nothing imports.",
+  "findings": [
+    {
+      "id": "R1",
+      "file": "app/repository.py",
+      "line": 10,
+      "function": "lookup_employees",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "employee_search",
+      "exploitability": "exploitable",
+      "why": "Query parameter `name` crosses two calls and is concatenated into SQL."
+    },
+    {
+      "id": "R2",
+      "file": "app/services.py",
+      "line": 17,
+      "function": "run_diagnostic",
+      "cwe": "CWE-78",
+      "reachability": "reachable",
+      "entry_point": "payroll_diagnostics",
+      "exploitability": "exploitable",
+      "why": "Query parameter `host` is concatenated into a shell command."
+    },
+    {
+      "id": "R3",
+      "file": "app/services.py",
+      "line": 22,
+      "function": "fetch_benefit_provider",
+      "cwe": "CWE-918",
+      "reachability": "reachable",
+      "entry_point": "benefit_preview",
+      "exploitability": "exploitable",
+      "why": "URL arrives through a FastAPI dependency and is fetched as-is."
+    },
+    {
+      "id": "R4",
+      "file": "app/services.py",
+      "line": 28,
+      "function": "SalaryCalculator.calculate",
+      "cwe": "CWE-95",
+      "reachability": "reachable",
+      "entry_point": "salary_formula",
+      "exploitability": "exploitable",
+      "why": "Query parameter `expression` reaches eval() through a method call."
+    },
+    {
+      "id": "R5",
+      "file": "app/services.py",
+      "line": 33,
+      "function": "decode_payroll_import",
+      "cwe": "CWE-502",
+      "reachability": "reachable",
+      "entry_point": "import_payroll",
+      "exploitability": "exploitable",
+      "why": "Request field `payload` is unpickled in a background task."
+    },
+    {
+      "id": "R6",
+      "file": "app/services.py",
+      "line": 38,
+      "function": "parse_policy",
+      "cwe": "CWE-502",
+      "reachability": "reachable",
+      "entry_point": "upload_policy",
+      "exploitability": "exploitable",
+      "why": "Request field `policy` is loaded with the unsafe YAML loader."
+    },
+    {
+      "id": "U1",
+      "file": "app/orphan_routes.py",
+      "line": 16,
+      "function": "orphan_employee_search",
+      "cwe": "CWE-89",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Route on a router that is never mounted."
+    },
+    {
+      "id": "U2",
+      "file": "app/orphan_routes.py",
+      "line": 22,
+      "function": "orphan_diagnostics",
+      "cwe": "CWE-78",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Route on a router that is never mounted."
+    },
+    {
+      "id": "U3",
+      "file": "app/legacy_jobs.py",
+      "line": 12,
+      "function": "fetch_old_provider",
+      "cwe": "CWE-918",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U4",
+      "file": "app/legacy_jobs.py",
+      "line": 17,
+      "function": "old_formula",
+      "cwe": "CWE-95",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U5",
+      "file": "app/legacy_jobs.py",
+      "line": 22,
+      "function": "decode_old_import",
+      "cwe": "CWE-502",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U6",
+      "file": "app/legacy_jobs.py",
+      "line": 27,
+      "function": "load_old_policy",
+      "cwe": "CWE-502",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    }
+  ]
+}

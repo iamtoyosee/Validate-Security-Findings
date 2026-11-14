@@ -1,0 +1,138 @@
+{
+  "app": "background-worker-lab",
+  "description": "Celery worker: one configured app, one orphaned app nothing loads. Task names repeat in services.py on purpose (tasks.run_diagnostic calls services.run_diagnostic).",
+  "findings": [
+    {
+      "id": "R1",
+      "file": "repository.py",
+      "line": 8,
+      "function": "lookup_employees",
+      "cwe": "CWE-89",
+      "reachability": "reachable",
+      "entry_point": "search_employees",
+      "exploitability": "exploitable",
+      "why": "Task argument `name` is concatenated into SQL. Exploitable by anyone who can influence the task's arguments."
+    },
+    {
+      "id": "R2",
+      "file": "services.py",
+      "line": 17,
+      "function": "services.run_diagnostic",
+      "cwe": "CWE-78",
+      "reachability": "reachable",
+      "entry_point": "tasks.run_diagnostic",
+      "exploitability": "exploitable",
+      "why": "Task argument `host` is concatenated into a shell command."
+    },
+    {
+      "id": "R3",
+      "file": "services.py",
+      "line": 23,
+      "function": "BonusCalculator.calculate",
+      "cwe": "CWE-95",
+      "reachability": "reachable",
+      "entry_point": "calculate_bonus",
+      "exploitability": "exploitable",
+      "why": "Task argument `expression` reaches eval()."
+    },
+    {
+      "id": "R4",
+      "file": "services.py",
+      "line": 28,
+      "function": "services.fetch_provider",
+      "cwe": "CWE-918",
+      "reachability": "reachable",
+      "entry_point": "tasks.fetch_provider",
+      "exploitability": "exploitable",
+      "why": "Task argument `url` is fetched as-is."
+    },
+    {
+      "id": "R5",
+      "file": "services.py",
+      "line": 33,
+      "function": "services.decode_import",
+      "cwe": "CWE-502",
+      "reachability": "reachable",
+      "entry_point": "tasks.decode_import",
+      "exploitability": "exploitable",
+      "why": "Task argument `payload` is unpickled."
+    },
+    {
+      "id": "R6",
+      "file": "services.py",
+      "line": 38,
+      "function": "services.load_policy",
+      "cwe": "CWE-502",
+      "reachability": "reachable",
+      "entry_point": "tasks.load_policy",
+      "exploitability": "exploitable",
+      "why": "Task argument `policy` is loaded with the unsafe YAML loader."
+    },
+    {
+      "id": "U1",
+      "file": "orphan_tasks.py",
+      "line": 16,
+      "function": "orphan_search",
+      "cwe": "CWE-89",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Task on a Celery app no worker loads."
+    },
+    {
+      "id": "U2",
+      "file": "orphan_tasks.py",
+      "line": 22,
+      "function": "orphan_diagnostic",
+      "cwe": "CWE-78",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Task on a Celery app no worker loads."
+    },
+    {
+      "id": "U3",
+      "file": "legacy_jobs.py",
+      "line": 12,
+      "function": "old_bonus",
+      "cwe": "CWE-95",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U4",
+      "file": "legacy_jobs.py",
+      "line": 17,
+      "function": "old_provider",
+      "cwe": "CWE-918",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U5",
+      "file": "legacy_jobs.py",
+      "line": 22,
+      "function": "old_import",
+      "cwe": "CWE-502",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    },
+    {
+      "id": "U6",
+      "file": "legacy_jobs.py",
+      "line": 27,
+      "function": "old_policy",
+      "cwe": "CWE-502",
+      "reachability": "unreachable",
+      "entry_point": null,
+      "exploitability": null,
+      "why": "Module is never imported."
+    }
+  ]
+}

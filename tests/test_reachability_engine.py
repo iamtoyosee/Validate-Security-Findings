@@ -10,7 +10,7 @@ from semgrep_adapter import from_semgrep, group_raw_results, hash_id
 from reachability.engine import build_call_graph, build_verdict, trace_reachability
 
 TODO_APP_DIR = Path(__file__).parent.parent / "src" / "sample-apps" / "todo-list-app"
-ECOMMERCE_APP_DIR = Path("/Users/ausman/Workload/Ecommerce-app")
+ECOMMERCE_APP_DIR = Path(__file__).parent.parent / "src" / "sample-apps" / "ecommerce-app"
 
 
 def load_todo_findings():
@@ -22,34 +22,30 @@ def load_todo_findings():
 
 
 def load_ecommerce_findings():
-    raw = json.loads((ECOMMERCE_APP_DIR / "semgrep_results.json").read_text())["results"]
-    target_lines = {76, 84, 91, 95, 104, 115, 119, 123}
-    app_py_raw = [r for r in raw if r["path"] == "app.py" and r["start"]["line"] in target_lines]
-    groups = group_raw_results(app_py_raw)
-    findings = {f.line_start: f for f in (from_semgrep(g) for g in groups)}
-    assert set(findings.keys()) == target_lines
-
-    # receipt_text (line 100): a genuine scanner coverage gap, not a Phase 1 bug - see
-    # ground_truth.md. Neither real Semgrep (`--config=auto`) nor Bandit flags this
-    # `Path / name` then `.read_text()` read anywhere. Scanner accuracy is out of scope
-    # for this project (docs/phase-0-foundations.md), so this finding is constructed by
-    # hand, the same shape a scanner's output would take, to still exercise the pipeline
-    # against this documented ground-truth function.
-    findings[100] = NormalizedFinding(
-        finding_id=hash_id("semgrep", "app.py", 100),
-        source_scanner="semgrep",
-        rule_ids=["constructed.path-traversal.receipt-read"],
-        vulnerability_type="constructed.path-traversal.receipt-read",
-        cwe=["CWE-22"],
-        severity="WARNING",
-        file_path="app.py",
-        line_start=100,
-        line_end=100,
-        column_start=None,
-        message="Hand-constructed finding - see ground_truth.md for why no real scanner flags this line.",
-        code_snippet=None,
-        raw=[],
-    )
+    # The e-commerce app's captured Semgrep output isn't checked in, so these findings
+    # are built from its answer key (ground_truth.json): one per documented line, the
+    # same shape a scanner's output takes. That includes receipt_text (line 100), which
+    # no scanner flags at all - see ground_truth.md.
+    truth = json.loads((ECOMMERCE_APP_DIR / "ground_truth.json").read_text())["findings"]
+    findings = {
+        entry["line"]: NormalizedFinding(
+            finding_id=hash_id("semgrep", entry["file"], entry["line"]),
+            source_scanner="semgrep",
+            rule_ids=[f"ground-truth.{entry['id']}"],
+            vulnerability_type=f"ground-truth.{entry['id']}",
+            cwe=[entry["cwe"]],
+            severity="ERROR",
+            file_path=entry["file"],
+            line_start=entry["line"],
+            line_end=entry["line"],
+            column_start=None,
+            message=entry["why"],
+            code_snippet=None,
+            raw=[],
+        )
+        for entry in truth
+    }
+    assert set(findings.keys()) == {76, 84, 91, 95, 100, 104, 115, 119, 123}
     return findings
 
 
