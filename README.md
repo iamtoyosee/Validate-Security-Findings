@@ -26,6 +26,14 @@ Either upload a folder, or pick one of the bundled sample apps (small, deliberat
 vulnerable demo projects built specifically to have a known, verified set of reachable
 and unreachable bugs — useful for trying the tool without needing your own code).
 
+Uploads are checked in the browser before anything is sent. Dependency folders and files
+no scanner uses are skipped. Files that usually hold secrets (`.env`, private keys,
+credentials) are blocked outright. Likely hardcoded secrets in source are flagged and
+redacted by default, with line numbers preserved so findings still point at the right
+place. You see exactly which files will leave your machine before you press Scan.
+
+![Upload preflight: what will be sent, what's blocked, and flagged secrets](docs/screenshots/upload-preflight.png)
+
 ### 2. Scan it, and collapse duplicate results
 
 The codebase is scanned with [Semgrep](https://semgrep.dev). Scanners routinely report
@@ -51,8 +59,8 @@ over completeness: no edge means no confident claim of a connection, not a guess
 
 ![An illustrative call graph diagram — routes, function calls, and one unreachable function highlighted](docs/screenshots/call-graph.png)
 
-*(That diagram is a hand-built illustration of the concept, not a live feature of the
-running app — there's no in-app graph visualization yet.)*
+*(That diagram is a hand-built illustration of the concept. In the app, each finding shows
+its own call path from entry point to sink rather than the whole graph.)*
 
 ### 4. Trace reachability
 
@@ -73,7 +81,10 @@ falsely confident **unreachable** — the tool says "can't tell" rather than gue
 
 ### 5. Judge exploitability — *designed, not yet built*
 
-This is the next piece, not something you can try yet. The plan, split into two tiers
+This is the next piece, not something you can try yet. The UI for it already exists:
+the Exploitability tab, the funnel's last step, and a section in every finding's detail
+panel. A *Preview with example verdicts* button fills them with clearly labeled example
+data so the design can be reviewed before the backend exists. The plan, split into two tiers
 for cost and safety reasons — full detail in
 [`docs/phase-4-5-exploitability-notes.md`](docs/phase-4-5-exploitability-notes.md):
 
@@ -86,6 +97,23 @@ for cost and safety reasons — full detail in
   and firing a real exploit at it to confirm, not just judge. Scoped only to this
   project's own controlled test apps — never run against a codebase someone else
   submitted.
+
+### 6. Prioritize, triage, and export
+
+Every finding gets a priority (P1–P4) from its severity, reachability, and (once it
+exists) exploitability. The score breakdown is one click away, so the ranking is never
+a black box. Opening a finding shows the call path from entry point to sink, the code,
+fix guidance for its CWE, and triage controls: confirm it, mark it a false positive or
+accepted risk, and leave a note. Results export as **SARIF 2.1.0** (ready for GitHub code
+scanning, with call paths as code flows and triage decisions as suppressions), CSV, JSON,
+or a Markdown report. Recent scans are kept so you can reopen them. Re-scanning shows
+what's new and what's resolved since last time.
+
+![A finding's detail panel: verdicts, priority, call path, code, and triage](docs/screenshots/finding-detail.png)
+
+Which of these features run on the server, which run in the browser, and which are
+designed but waiting on the backend is tracked in the app's **Roadmap** panel and in
+[`docs/frontend-feature-roadmap.md`](docs/frontend-feature-roadmap.md).
 
 ## Try it
 
@@ -125,7 +153,10 @@ pytest (testing). Full reasoning behind each choice:
 - **Reachability:** done — call graph, entry-point detection (HTTP, Django, Celery),
   backward tracing, confidence model. 34/34 correct against real ground-truth apps,
   87 tests passing.
-- **Exploitability:** designed, not yet built (see step 5 above).
+- **Results UI:** overview, findings triage table, reachability view, finding detail
+  panel, upload preflight, exports, and scan history. Feature status and backend contract:
+  [`docs/frontend-feature-roadmap.md`](docs/frontend-feature-roadmap.md).
+- **Exploitability:** designed, UI built, backend not yet built (see step 5 above).
 - **Everything past that** (prioritization/reporting, a local-CLI mode so scanning can
   run entirely on your own machine, more languages/scanners, continuous re-validation on
   new commits): planned, not started.
