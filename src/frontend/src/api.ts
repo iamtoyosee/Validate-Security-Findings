@@ -1,4 +1,4 @@
-import type { ScanResponse, SampleApp } from "./types";
+import type { SampleApp, ScanOptions, ScanResponse, UploadEntry } from "./types";
 
 // VITE_API_URL: the deployed backend's base URL, e.g. "https://my-backend.onrender.com".
 // Falls back to localhost so `npm run dev` keeps working with no setup.
@@ -18,13 +18,18 @@ async function parseScanResponse(response: Response): Promise<ScanResponse> {
   return response.json();
 }
 
-/** POSTs the selected folder's files to the scan endpoint, preserving relative paths. */
-export async function scanCodebase(files: File[]): Promise<ScanResponse> {
+/**
+ * POSTs the preflighted files to the scan endpoint, preserving relative paths.
+ * `options` rides along as a JSON form field - the backend ignores it today
+ * (FastAPI drops undeclared form fields) and can start honoring it per-option.
+ */
+export async function scanCodebase(entries: UploadEntry[], options: ScanOptions, signal?: AbortSignal): Promise<ScanResponse> {
   const formData = new FormData();
-  for (const file of files) {
-    formData.append("files", file, file.webkitRelativePath || file.name);
+  for (const { path, file } of entries) {
+    formData.append("files", file, path);
   }
-  const response = await fetch(`${API_BASE}/api/scan`, { method: "POST", body: formData });
+  formData.append("options", JSON.stringify(options));
+  const response = await fetch(`${API_BASE}/api/scan`, { method: "POST", body: formData, signal });
   return parseScanResponse(response);
 }
 
@@ -34,11 +39,13 @@ export async function listSamples(): Promise<SampleApp[]> {
   return response.json();
 }
 
-export async function scanSample(sampleId: string): Promise<ScanResponse> {
+/** `options` is an extra JSON key; ScanSampleRequest (pydantic) ignores unknown keys. */
+export async function scanSample(sampleId: string, options: ScanOptions, signal?: AbortSignal): Promise<ScanResponse> {
   const response = await fetch(`${API_BASE}/api/scan-sample`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sample_id: sampleId }),
+    body: JSON.stringify({ sample_id: sampleId, options }),
+    signal,
   });
   return parseScanResponse(response);
 }

@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + TypeScript + Vite, plain CSS, no runtime dependencies beyond React.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # http://localhost:5173 — expects the API on http://localhost:8000
+npm run build    # type-check + production build
+npm run lint     # oxlint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Set `VITE_API_URL` to point at a deployed backend.
+
+## How it's organized
+
+- **`src/types.ts`** is the API contract. Fields marked *PROPOSED* are optional. The UI
+  renders them as soon as the backend returns them.
+- **`src/lib/`** holds plain TypeScript with no JSX: joining findings with their verdicts,
+  priority scoring, upload preflight, exports, storage and filters.
+- **`src/components/`** holds the views.
+- **`src/lib/capabilities.ts`** lists which features are live on the server, which run in
+  the browser, and which are planned. It drives the in-app Roadmap panel and the
+  `PLANNED` tags, so nothing in the UI pretends to work when it doesn't.
+
+Full feature list and backend contract:
+[`docs/frontend-feature-roadmap.md`](../../docs/frontend-feature-roadmap.md).

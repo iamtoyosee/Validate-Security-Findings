@@ -42,6 +42,12 @@ and an open question about Semgrep firing two rules per location (6 raw results 
 | 8 | Scale: more languages, scanners, frameworks | Not started | — |
 | 9 | Continuous validation: diff-aware re-validation on new commits | Not started | — |
 
+Frontend: every feature's status (server / in-browser / planned) and the response fields
+the backend should return next are in
+[docs/frontend-feature-roadmap.md](docs/frontend-feature-roadmap.md); the in-app Roadmap
+panel reads from `src/frontend/src/lib/capabilities.ts` — flip an entry's status there
+when its backend half lands.
+
 See [docs/project-design.md](docs/project-design.md) for goal/scope/constraints and
 [docs/prior-art.md](docs/prior-art.md) for researched open-source and academic reference
 projects gathered before committing to Phase 1's toolchain.

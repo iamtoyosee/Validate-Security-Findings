@@ -1,118 +1,160 @@
 import { useState } from "react";
-import type { Finding, ReachabilityVerdict, ScanResponse } from "../types";
+import type { ValidatedFinding } from "../lib/validated";
+import { pathHops, plural } from "../lib/validated";
+import { cweName } from "../lib/remediation";
+import type { ReachabilityStatus, ReachabilityVerdict } from "../types";
+import { Card, ConfidenceMeter, EmptyState, Icon, PriorityBadge, SeverityBadge } from "./ui";
 
-function StatusBadge({ status }: { status: string }) {
-  return <span className={`badge badge-status-${status}`}>{status}</span>;
-}
+const GROUPS: { status: ReachabilityStatus; title: string; blurb: string }[] = [
+  {
+    status: "reachable",
+    title: "Reachable",
+    blurb: "A confirmed call path connects an entry point to the vulnerable code. Review these first.",
+  },
+  {
+    status: "unknown",
+    title: "Unknown",
+    blurb: "An ambiguous call blocked the trace. The tool says “can't tell” rather than guessing — worth a quick manual look.",
+  },
+  {
+    status: "unreachable",
+    title: "Unreachable",
+    blurb: "No caller chain leads to a known entry point (HTTP routes, Django URLs, Celery tasks). Safe to deprioritize, not to ignore.",
+  },
+];
 
-function ReachabilityDetail({
-  finding,
-  verdict,
-  onClose,
-}: {
-  finding: Finding;
-  verdict: ReachabilityVerdict;
-  onClose: () => void;
-}) {
+export function ReachabilityView({ rows, onOpen }: { rows: ValidatedFinding[]; onOpen: (id: string) => void }) {
+  const [collapsed, setCollapsed] = useState<Set<ReachabilityStatus>>(new Set(["unreachable"]));
+  const analyzed = rows.filter((r) => r.reachability);
+
+  if (analyzed.length === 0) {
+    return (
+      <EmptyState icon="route" title="No reachability results">
+        <p>There are no findings to trace for this scan.</p>
+      </EmptyState>
+    );
+  }
+
+  const count = (s: ReachabilityStatus) => analyzed.filter((r) => r.reachability!.status === s).length;
+  const pct = (s: ReachabilityStatus) => (count(s) / analyzed.length) * 100;
+
+  // Attack surface: which entry points actually lead somewhere dangerous.
+  const surface = new Map<string, ValidatedFinding[]>();
+  for (const r of analyzed) {
+    const ep = r.reachability!.status === "reachable" ? r.reachability!.entry_point : null;
+    if (ep) surface.set(ep, [...(surface.get(ep) ?? []), r]);
+  }
+  const surfaceList = [...surface.entries()].sort((a, b) => b[1].length - a[1].length);
+
   return (
-    <div className="finding-detail">
-      <button type="button" className="close-button" onClick={onClose}>
-        ← Back to list
-      </button>
-      <h3>
-        {finding.file_path}:{finding.line_start}
-      </h3>
-      <StatusBadge status={verdict.status} />
-      <dl>
-        <dt>Confidence</dt>
-        <dd>{verdict.confidence}</dd>
-        <dt>Containing function</dt>
-        <dd>{verdict.containing_function ?? "—"}</dd>
-        <dt>Entry point</dt>
-        <dd>{verdict.entry_point ?? "—"}</dd>
-        <dt>Call path</dt>
-        <dd>{verdict.call_path ? verdict.call_path.join(" → ") : "—"}</dd>
-        <dt>Reason</dt>
-        <dd>{verdict.reason}</dd>
-      </dl>
-      <h4>Underlying finding</h4>
-      <dl>
-        <dt>Message</dt>
-        <dd>{finding.message}</dd>
-      </dl>
-      {finding.code_snippet && (
-        <>
-          <h4>Code snippet</h4>
-          <pre>{finding.code_snippet}</pre>
-        </>
-      )}
+    <div className="reach">
+      <div className="reach-top">
+        <Card className="reach-summary">
+          <div className="big-stat">
+            <span className="big-num">{Math.round(pct("reachable"))}%</span>
+            <span className="big-label">
+              of findings are reachable ({count("reachable")} of {analyzed.length}) — the rest can wait.
+            </span>
+          </div>
+          <div className="stacked" role="img" aria-label="Share of findings by reachability">
+            {GROUPS.map((g) => (
+              <span key={g.status} className={`stacked-${g.status}`} style={{ width: `${pct(g.status)}%` }} />
+            ))}
+          </div>
+          <div className="legend">
+            {GROUPS.map((g) => (
+              <span key={g.status}>
+                <span className={`legend-dot stacked-${g.status}`} />
+                {g.title} <strong>{count(g.status)}</strong>
+              </span>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="Attack surface" aside={<span className="muted small">Entry points that lead to a finding</span>} className="surface">
+          {surfaceList.length === 0 ? (
+            <p className="muted pad">No entry point reaches any finding.</p>
+          ) : (
+            <ul className="surface-list">
+              {surfaceList.map(([ep, list]) => (
+                <li key={ep}>
+                  <code className="surface-ep">{ep}</code>
+                  <span className="surface-n">{plural(list.length, "finding")}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      {GROUPS.map((g) => {
+        const list = analyzed.filter((r) => r.reachability!.status === g.status);
+        if (list.length === 0) return null;
+        const isCollapsed = collapsed.has(g.status);
+        return (
+          <section key={g.status} className={`reach-group reach-group-${g.status}`}>
+            <button
+              type="button"
+              className="reach-group-head"
+              aria-expanded={!isCollapsed}
+              onClick={() => {
+                const next = new Set(collapsed);
+                if (isCollapsed) next.delete(g.status);
+                else next.add(g.status);
+                setCollapsed(next);
+              }}
+            >
+              <Icon name={isCollapsed ? "chevronRight" : "chevronDown"} />
+              <span className={`legend-dot stacked-${g.status}`} />
+              <span className="reach-group-title">{g.title}</span>
+              <span className="tab-count">{list.length}</span>
+              <span className="reach-group-blurb">{g.blurb}</span>
+            </button>
+            {!isCollapsed && (
+              <ul className="reach-list">
+                {list.map((r) => (
+                  <li key={r.id}>
+                    <button type="button" className="reach-row" onClick={() => onOpen(r.id)}>
+                      <span className="reach-row-main">
+                        <span className="reach-row-title">
+                          <PriorityBadge tier={r.priority.tier} />
+                          {r.finding.cwe[0] ? cweName(r.finding.cwe[0]) : r.finding.message}
+                          <SeverityBadge severity={r.severity} />
+                        </span>
+                        <span className="mono small muted">
+                          {r.finding.file_path}:{r.finding.line_start}
+                        </span>
+                        {r.reachability!.call_path && r.reachability!.call_path.length > 0 ? (
+                          <Crumbs reach={r.reachability!} />
+                        ) : (
+                          <span className="small reach-reason">{r.reachability!.reason}</span>
+                        )}
+                      </span>
+                      <ConfidenceMeter confidence={r.reachability!.confidence} />
+                      <Icon name="chevronRight" className="muted" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }
 
-export function ReachabilityView({ result }: { result: ScanResponse }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const findingsById = new Map(result.findings.map((f) => [f.finding_id, f]));
-
-  if (selectedId) {
-    const finding = findingsById.get(selectedId);
-    const verdict = result.reachability.find((v) => v.finding_id === selectedId);
-    if (finding && verdict) {
-      return <ReachabilityDetail finding={finding} verdict={verdict} onClose={() => setSelectedId(null)} />;
-    }
-  }
-
-  const total = result.reachability.length;
-  const reachableCount = result.reachability.filter((v) => v.status === "reachable").length;
-  const reachablePct = total === 0 ? 0 : Math.round((reachableCount / total) * 100);
-
+function Crumbs({ reach }: { reach: ReachabilityVerdict }) {
+  const { entry, hops } = pathHops(reach);
   return (
-    <div className="findings-view">
-      {total > 0 && (
-        <div className="stat-card">
-          <span className="stat-value">{reachablePct}%</span>
-          <span className="stat-label">
-            of findings are actually reachable ({reachableCount} of {total}) — the rest can wait
-          </span>
-        </div>
-      )}
-      <p className="findings-summary">
-        {total} finding{total === 1 ? "" : "s"} analyzed, {reachableCount} reachable
-      </p>
-      {result.reachability.length === 0 ? (
-        <p>No findings to analyze.</p>
-      ) : (
-        <>
-          <div className="finding-row finding-row-reachability finding-row-header" aria-hidden="true">
-            <span>Location</span>
-            <span>Status</span>
-            <span>Reason</span>
-            <span />
-          </div>
-          <ul className="findings-list">
-            {result.reachability.map((v) => {
-              const finding = findingsById.get(v.finding_id);
-              if (!finding) return null;
-              return (
-                <li key={v.finding_id}>
-                  <button
-                    type="button"
-                    className="finding-row finding-row-reachability"
-                    onClick={() => setSelectedId(v.finding_id)}
-                  >
-                    <span className="finding-location">
-                      {finding.file_path}:{finding.line_start}
-                    </span>
-                    <StatusBadge status={v.status} />
-                    <span className="finding-message">{v.reason}</span>
-                    <span className="finding-chevron" aria-hidden="true">›</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-    </div>
+    <span className="crumbs">
+      {entry && <code className="crumb crumb-entry">{entry}</code>}
+      {hops.map((fn, i) => (
+        <span key={`${fn}-${i}`} className="crumb-wrap">
+          <Icon name="chevronRight" size={11} className="muted" />
+          <code className="crumb">{fn}</code>
+        </span>
+      ))}
+    </span>
   );
 }
