@@ -17,6 +17,25 @@ class NormalizedFinding:
     message: str                  # first/primary rule's human-readable description
     code_snippet: Optional[str]   # DERIVED by us, not sourced from scanner - see decision below
     raw: list[dict]                # ALL original raw scanner records for this location, untouched
+    # Every scanner that reported this bug. One entry (== source_scanner) straight out
+    # of an adapter; more once cross-scanner deduplication has folded duplicates in.
+    scanners: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class DedupGroup:
+    """Two or more findings, from different scanners, judged to be the same bug.
+
+    Shape decided in docs/phase-0-foundations.md ("Open questions"): deduplication is its
+    own step after normalization and never changes how finding_id is computed. The
+    canonical finding is the one the rest of the pipeline analyzes; the members are kept
+    so nothing a scanner said is lost.
+    """
+    group_id: str
+    canonical_finding_id: str
+    member_finding_ids: list[str]     # includes the canonical one
+    scanners: list[str]
+    reason: str                       # why they were matched, in plain words
 
 
 @dataclass(frozen=True)

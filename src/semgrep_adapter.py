@@ -11,11 +11,11 @@ from schemas import NormalizedFinding
 SEVERITY_RANK = {"ERROR": 3, "WARNING": 2, "INFO": 1}
 
 
-def run_semgrep(codebase_path: Path) -> list[dict]:
+def run_semgrep(codebase_path: Path, ruleset: str = "auto") -> list[dict]:
     # --config=auto requires network access and does not support --metrics=off
     # (semgrep refuses to run auto config selection with metrics disabled)
     result = subprocess.run(
-        ["semgrep", "scan", "--config=auto", "--json"],
+        ["semgrep", "scan", f"--config={ruleset}", "--json"],
         cwd=codebase_path,
         capture_output=True,
         text=True,
@@ -37,10 +37,12 @@ def hash_id(*parts: str) -> str:
     return hashlib.sha256(joined.encode()).hexdigest()[:16]
 
 
-def extract_cwes(cwe_entries: list[str]) -> list[str]:
+def extract_cwes(cwe_entries) -> list[str]:
+    if isinstance(cwe_entries, str):   # some rules give one string instead of a list
+        cwe_entries = [cwe_entries]
     codes = []
-    for entry in cwe_entries:
-        match = re.match(r"(CWE-\d+)", entry)
+    for entry in cwe_entries or []:
+        match = re.match(r"(CWE-\d+)", str(entry))
         if match:
             codes.append(match.group(1))
     return codes
@@ -60,7 +62,7 @@ def from_semgrep(raw_group: list[dict]) -> NormalizedFinding:
     primary = raw_group[0]   # representative record for display fields
     all_cwes = []
     for r in raw_group:
-        for code in extract_cwes(r["extra"]["metadata"].get("cwe", [])):
+        for code in extract_cwes(r["extra"].get("metadata", {}).get("cwe", [])):
             if code not in all_cwes:
                 all_cwes.append(code)
     highest_severity = max(
@@ -81,4 +83,5 @@ def from_semgrep(raw_group: list[dict]) -> NormalizedFinding:
         message=primary["extra"]["message"],
         code_snippet=None,   # filled in later via read_snippet() against the materialized local codebase
         raw=raw_group,
+        scanners=["semgrep"],
     )
